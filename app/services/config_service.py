@@ -1700,6 +1700,18 @@ class ConfigService:
 
                         # 直接传入 token 给 pro_api，不调用 set_token 避免写 tk.csv 文件
                         pro = ts.pro_api(api_key)
+
+                        # 🔥 应用自定义 API 端点
+                        endpoint = getattr(ds_config, 'endpoint', None)
+                        if not endpoint and db_config:
+                            endpoint = getattr(db_config, 'endpoint', None)
+                        if endpoint:
+                            try:
+                                pro._DataApi__http_url = endpoint
+                                logger.info(f"🌐 [TEST] 使用自定义 Tushare 端点: {endpoint}")
+                            except AttributeError:
+                                logger.warning(f"⚠️ [TEST] 无法设置 Tushare 自定义端点，将使用 SDK 默认值")
+
                         # 获取交易日历（轻量级测试）
                         df = pro.trade_cal(exchange='SSE', start_date='20240101', end_date='20240101')
                     finally:
