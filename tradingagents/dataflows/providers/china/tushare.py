@@ -114,6 +114,35 @@ class TushareProvider(BaseStockDataProvider):
 
         return None
 
+    def _get_endpoint_from_database(self) -> Optional[str]:
+        """
+        从数据库读取 Tushare 自定义 API 端点
+
+        优先级：数据库配置 > 环境变量 (providers_config)
+        这样用户在 Web 后台修改配置后可以立即生效
+        """
+        try:
+            from app.core.database import get_mongo_db_sync
+            db = get_mongo_db_sync()
+            config_collection = db.system_configs
+
+            config_data = config_collection.find_one(
+                {"is_active": True},
+                sort=[("version", -1)]
+            )
+
+            if config_data and config_data.get('data_source_configs'):
+                for ds_config in config_data['data_source_configs']:
+                    if ds_config.get('type') == 'tushare':
+                        endpoint = ds_config.get('endpoint')
+                        if endpoint:
+                            self.logger.info(f"✅ [DB查询] 找到 Tushare 端点: {endpoint}")
+                            return endpoint
+        except Exception as e:
+            self.logger.warning(f"⚠️ [DB查询] 从数据库读取 Tushare 端点失败: {e}")
+
+        return None
+
     def _ensure_api_client(self, validate: bool = False) -> bool:
         """确保 Tushare API Client 已初始化。Tushare 是 HTTP API，不维护长连接。
 
@@ -165,6 +194,19 @@ class TushareProvider(BaseStockDataProvider):
                     # 直接传入 token 给 pro_api，不调用 set_token 避免写 tk.csv 文件
                     # ts.set_token(token) 会把 token 缓存到 ~/tk.csv，在沙箱等受限环境会 Permission denied
                     api = ts.pro_api(token)
+
+                    # 🔥 应用自定义 API 端点（数据库配置优先于环境变量）
+                    endpoint = self._get_endpoint_from_database()
+                    if not endpoint:
+                        endpoint = self.config.get('endpoint')
+                    if endpoint:
+                        # tushare SDK 内部硬编码了 __http_url，需要 monkey-patch
+                        # Python name mangling: DataApi.__http_url → _DataApi__http_url
+                        try:
+                            api._DataApi__http_url = endpoint
+                            self.logger.info(f"🌐 Tushare 使用自定义端点: {endpoint}")
+                        except AttributeError:
+                            self.logger.warning(f"⚠️ 无法设置 Tushare 自定义端点，将使用 SDK 默认值")
 
                     if validate:
                         test_data = api.stock_basic(list_status='L', limit=1)
