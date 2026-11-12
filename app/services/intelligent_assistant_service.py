@@ -1767,7 +1767,13 @@ def get_system_llm_config_from_config_doc(
             purpose="first_enabled",
         )
         if llm_config is not None:
-            return llm_config
+            if llm_config.api_key:
+                return llm_config
+            logger.info(
+                "[LLM配置] fallback 跳过 %s/%s：缺少有效 API Key，继续查找下一个",
+                llm_config_doc.get("provider") or "-",
+                llm_config.model,
+            )
 
     return None
 
