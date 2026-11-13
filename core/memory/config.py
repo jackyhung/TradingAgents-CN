@@ -21,6 +21,7 @@ _MEM0_COLLECTION_PREFIX = "mem0_memories"
 _MEM0_OPENAI_COMPATIBLE_PROVIDERS = {
     "openai",
     "dashscope",
+    "bailian",
     "siliconflow",
     "302ai",
     "openrouter",
